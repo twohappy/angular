@@ -22,18 +22,18 @@ version: 2.1
 # **NOTE 1 **: If you change the cache key prefix, also sync the cache_key_fallback to match.
 # **NOTE 2 **: Keep the static part of the cache key as prefix to enable correct fallbacks.
 # See https://circleci.com/docs/2.0/caching/#restoring-cache for how prefixes work in CircleCI.
-var_3: &cache_key v4-angular-node-12-{{ checksum ".bazelversion" }}-{{ checksum "yarn.lock" }}-{{ checksum "WORKSPACE" }}-{{ checksum "packages/bazel/package.bzl" }}-{{ checksum "aio/yarn.lock" }}
+var_3: &cache_key v6-angular-node-12-{{ checksum ".bazelversion" }}-{{ checksum "yarn.lock" }}-{{ checksum "WORKSPACE" }}-{{ checksum "packages/bazel/package.bzl" }}-{{ checksum "aio/yarn.lock" }}
 # We invalidate the cache if the Bazel version changes because otherwise the `bazelisk` cache
 # folder will contain all previously used versions and ultimately cause the cache restoring to
 # be slower due to its growing size.
-var_4: &cache_key_fallback v4-angular-node-12-{{ checksum ".bazelversion" }}
-var_3_win: &cache_key_win v5-angular-win-node-12-{{ checksum ".bazelversion" }}-{{ checksum "yarn.lock" }}-{{ checksum "WORKSPACE" }}-{{ checksum "packages/bazel/package.bzl" }}-{{ checksum "aio/yarn.lock" }}
-var_4_win: &cache_key_win_fallback v5-angular-win-node-12-{{ checksum ".bazelversion" }}
+var_4: &cache_key_fallback v6-angular-node-12-{{ checksum ".bazelversion" }}
+var_3_win: &cache_key_win v6-angular-win-node-12-{{ checksum ".bazelversion" }}-{{ checksum "yarn.lock" }}-{{ checksum "WORKSPACE" }}-{{ checksum "packages/bazel/package.bzl" }}-{{ checksum "aio/yarn.lock" }}
+var_4_win: &cache_key_win_fallback v6-angular-win-node-12-{{ checksum ".bazelversion" }}
 
 # Cache key for the `components-repo-unit-tests` job. **Note** when updating the SHA in the
 # cache keys also update the SHA for the "COMPONENTS_REPO_COMMIT" environment variable.
-var_5: &components_repo_unit_tests_cache_key v5-angular-components-598db096e668aa7e9debd56eedfd127b7a55e371
-var_6: &components_repo_unit_tests_cache_key_fallback v5-angular-components-
+var_5: &components_repo_unit_tests_cache_key v6-angular-components-598db096e668aa7e9debd56eedfd127b7a55e371
+var_6: &components_repo_unit_tests_cache_key_fallback v6-angular-components-
 
 # Workspace initially persisted by the `setup` job, and then enhanced by `build-npm-packages` and
 # `build-ivy-npm-packages`.
@@ -278,9 +278,10 @@ jobs:
       - run: 'yarn bazel:lint ||
               (echo -e "\n.bzl files have lint errors. Please run ''yarn bazel:lint-fix''"; exit 1)'
 
-      - run: yarn lint --branch $CI_GIT_BASE_REVISION
-      - run: yarn ts-circular-deps:check
+      - run: yarn -s lint --branch $CI_GIT_BASE_REVISION
+      - run: yarn -s ts-circular-deps:check
       - run: yarn -s ng-dev pullapprove verify
+      - run: yarn -s ng-dev commit-message validate-range --range $CI_COMMIT_RANGE
 
   test:
     executor:
@@ -454,7 +455,7 @@ jobs:
 
   test_docs_examples:
     parameters:
-      ivy:
+      viewengine:
         type: boolean
         default: false
     executor:
@@ -470,7 +471,7 @@ jobs:
         # Run examples tests. The "CIRCLE_NODE_INDEX" will be set if "parallelism" is enabled.
         # Since the parallelism is set to "5", there will be five parallel CircleCI containers.
         # with either "0", "1", etc as node index. This can be passed to the "--shard" argument.
-      - run: yarn --cwd aio example-e2e --setup --local <<# parameters.ivy >>--ivy<</ parameters.ivy >> --cliSpecsConcurrency=5 --shard=${CIRCLE_NODE_INDEX}/${CIRCLE_NODE_TOTAL} --retry 2
+      - run: yarn --cwd aio example-e2e --setup --local <<# parameters.viewengine >>--viewengine<</ parameters.viewengine >> --cliSpecsConcurrency=5 --shard=${CIRCLE_NODE_INDEX}/${CIRCLE_NODE_TOTAL} --retry 2
 
   # This job should only be run on PR builds, where `CI_PULL_REQUEST` is not `false`.
   aio_preview:
@@ -822,8 +823,8 @@ workflows:
           requires:
             - build-npm-packages
       - test_docs_examples:
-          name: test_docs_examples_ivy
-          ivy: true
+          name: test_docs_examples_viewengine
+          viewengine: true
           requires:
             - build-npm-packages
       - aio_preview:
@@ -850,7 +851,7 @@ workflows:
             - test_aio_local
             - test_aio_local_viewengine
             - test_docs_examples
-            - test_docs_examples_ivy
+            - test_docs_examples_viewengine
             # Get the artifacts to publish from the build-packages-dist job
             # since the publishing script expects the legacy outputs layout.
             - build-npm-packages
